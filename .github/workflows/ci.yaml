@@ -71,13 +71,12 @@ jobs:
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:latest .
 
 # ---------------- SNYK IMAGE SCAN ----------------
-      - name: Snyk Container Scan
-        run: |
-          npm install -g snyk
-          snyk auth $SNYK_TOKEN
-          snyk container test ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:latest --severity-threshold=medium
+      - name: Run Snyk to check Docker image for vulnerabilities
+        uses: snyk/actions/docker@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:latest
 
 # ---------------- PUSH IMAGE ----------------
       - name: Push Docker Image
