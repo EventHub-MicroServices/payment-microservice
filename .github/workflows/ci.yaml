@@ -1,0 +1,94 @@
+name: SonarQube Scan & Snyk Alert
+
+on:
+  push:
+    branches:
+      - actions
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sonarqube:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+# ---------------- SONARQUBE ----------------
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@v3
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=hospital-management-system
+            -Dsonar.sources=.
+
+      - name: SonarQube Quality Gate Check
+        id: sonarqube-quality-gate-check
+        uses: sonarsource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+# ---------------- SNYK SCA ----------------
+      - name: Snyk Security Scan
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk auth $SNYK_TOKEN
+          snyk test --severity-threshold=medium
+
+# ---------------- FAILURE EMAIL ----------------
+      - name: Send Notification on Failure
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "❌ Pipeline Failed: ${{ github.repository }}"
+          body: |
+            Pipeline says: Pipeline Failed!
+
+            Project: ${{ github.repository }}
+
+            Reason:
+            - SonarQube Quality Gate failed OR
+            - Snyk found vulnerabilities (>= MEDIUM)
+
+            Check logs:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          to: ${{ secrets.RECIVER_EMAIL }}
+          from: DevOps Alert
+
+# ---------------- SUCCESS EMAIL ----------------
+      - name: Send Notification on Success
+        if: success()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "✅ Pipeline Success: ${{ github.repository }}"
+          body: |
+            Pipeline says: Pipeline Passed!
+
+            Project: ${{ github.repository }}
+
+            ✔ SonarQube Quality Gate Passed
+            ✔ No vulnerabilities found by Snyk
+
+            View Sonar Report:
+            ${{ secrets.SONAR_HOST_URL }}/dashboard?id=hospital-management-system
+
+          to: ${{ secrets.RECIVER_EMAIL }}
+          from: DevOps Alert
