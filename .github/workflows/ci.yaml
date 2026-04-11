@@ -42,7 +42,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          args: --severity-threshold=medium
+          args: --file=src/requirements.txt --severity-threshold=medium
 
 # ---------------- FAILURE EMAIL ----------------
       - name: Send Notification on Failure
