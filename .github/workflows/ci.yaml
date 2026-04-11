@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+# ---------------- CHECKOUT ----------------
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
@@ -36,13 +37,27 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-# ---------------- SNYK SCA ----------------
-      - name: Snyk Security Scan
-        uses: snyk/actions/python@master
+# ---------------- SETUP PYTHON ----------------
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+# ---------------- INSTALL DEPENDENCIES ----------------
+      - name: Install dependencies
+        run: |
+          cd src
+          pip install -r requirements.txt
+
+# ---------------- SNYK SCAN ----------------
+      - name: Run Snyk Scan
+        run: |
+          npm install -g snyk
+          cd src
+          snyk auth $SNYK_TOKEN
+          snyk test --file=requirements.txt --severity-threshold=medium
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --file=src/requirements.txt --severity-threshold=medium
 
 # ---------------- FAILURE EMAIL ----------------
       - name: Send Notification on Failure
@@ -55,13 +70,17 @@ jobs:
           password: ${{ secrets.EMAIL_PASSWORD }}
           subject: "❌ Pipeline Failed: ${{ github.repository }}"
           body: |
-            Pipeline says: Pipeline Failed!
+            🚨 Pipeline Failed!
+
             Project: ${{ github.repository }}
-            Reason:
-            - SonarQube Quality Gate failed OR
-            - Snyk found vulnerabilities (>= MEDIUM)
-            Check logs:
+
+            Reasons:
+            - SonarQube Quality Gate Failed
+            - OR Snyk found vulnerabilities (>= MEDIUM)
+
+            Logs:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
           to: ${{ secrets.RECIVER_EMAIL }}
           from: DevOps Alert
 
@@ -76,11 +95,15 @@ jobs:
           password: ${{ secrets.EMAIL_PASSWORD }}
           subject: "✅ Pipeline Success: ${{ github.repository }}"
           body: |
-            Pipeline says: Pipeline Passed!
+            🎉 Pipeline Passed!
+
             Project: ${{ github.repository }}
+
             ✔ SonarQube Quality Gate Passed
             ✔ No vulnerabilities found by Snyk
+
             View Sonar Report:
             ${{ secrets.SONAR_HOST_URL }}/dashboard?id=payment-microservice
+
           to: ${{ secrets.RECIVER_EMAIL }}
           from: DevOps Alert
