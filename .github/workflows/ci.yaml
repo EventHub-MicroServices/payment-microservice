@@ -41,9 +41,8 @@ jobs:
         uses: snyk/actions/python@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          snyk auth $SNYK_TOKEN
-          snyk test --severity-threshold=medium
+        with:
+          args: --severity-threshold=medium
 
 # ---------------- FAILURE EMAIL ----------------
       - name: Send Notification on Failure
@@ -57,16 +56,12 @@ jobs:
           subject: "❌ Pipeline Failed: ${{ github.repository }}"
           body: |
             Pipeline says: Pipeline Failed!
-
             Project: ${{ github.repository }}
-
             Reason:
             - SonarQube Quality Gate failed OR
             - Snyk found vulnerabilities (>= MEDIUM)
-
             Check logs:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
           to: ${{ secrets.RECIVER_EMAIL }}
           from: DevOps Alert
 
@@ -82,14 +77,10 @@ jobs:
           subject: "✅ Pipeline Success: ${{ github.repository }}"
           body: |
             Pipeline says: Pipeline Passed!
-
             Project: ${{ github.repository }}
-
             ✔ SonarQube Quality Gate Passed
             ✔ No vulnerabilities found by Snyk
-
             View Sonar Report:
-            ${{ secrets.SONAR_HOST_URL }}/dashboard?id=hospital-management-system
-
+            ${{ secrets.SONAR_HOST_URL }}/dashboard?id=payment-microservice
           to: ${{ secrets.RECIVER_EMAIL }}
           from: DevOps Alert
