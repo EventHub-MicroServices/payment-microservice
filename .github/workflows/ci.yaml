@@ -31,7 +31,6 @@ jobs:
             -Dsonar.sources=.
 
       - name: SonarQube Quality Gate Check
-        id: sonarqube-quality-gate-check
         uses: sonarsource/sonarqube-quality-gate-action@v1
         timeout-minutes: 5
         env:
@@ -61,11 +60,15 @@ jobs:
 
 # ---------------- DOCKER LOGIN ----------------
       - name: Docker Login
-        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login \
+          -u "${{ secrets.DOCKERHUB_USERNAME }}" \
+          --password-stdin
 
 # ---------------- BUILD DOCKER IMAGE ----------------
       - name: Build Docker Image
-        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:latest .
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:latest .
 
 # ---------------- SNYK IMAGE SCAN ----------------
       - name: Snyk Container Scan
@@ -78,7 +81,8 @@ jobs:
 
 # ---------------- PUSH IMAGE ----------------
       - name: Push Docker Image
-        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:latest
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:latest
 
 # ---------------- FAILURE EMAIL ----------------
       - name: Send Notification on Failure
@@ -91,14 +95,14 @@ jobs:
           password: ${{ secrets.EMAIL_PASSWORD }}
           subject: "❌ Pipeline Failed: ${{ github.repository }}"
           body: |
-            🚨 Pipeline Failed!
+            🚨 DevSecOps Pipeline Failed!
 
             Project: ${{ github.repository }}
 
-            Reasons:
-            - SonarQube Quality Gate Failed
-            - OR Snyk SCA found vulnerabilities
-            - OR Docker Image Scan failed
+            Failed Stage:
+            - SonarQube OR
+            - Snyk SCA OR
+            - Docker Scan
 
             Logs:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -117,14 +121,13 @@ jobs:
           password: ${{ secrets.EMAIL_PASSWORD }}
           subject: "✅ Pipeline Success: ${{ github.repository }}"
           body: |
-            🎉 Pipeline Passed!
+            🎉 DevSecOps Pipeline Passed!
 
-            Project: ${{ github.repository }}
+            ✔ SonarQube Quality Gate
+            ✔ Snyk SCA Scan
+            ✔ Docker Image Scan
 
-            ✔ SonarQube Quality Gate Passed
-            ✔ Snyk SCA Passed
-            ✔ Docker Image Scan Passed
-            ✔ Image pushed successfully 🚀
+            🚀 Image pushed successfully
 
             View Sonar Report:
             ${{ secrets.SONAR_HOST_URL }}/dashboard?id=payment-microservice
