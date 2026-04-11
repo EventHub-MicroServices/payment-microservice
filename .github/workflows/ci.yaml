@@ -49,8 +49,8 @@ jobs:
           cd src
           pip install -r requirements.txt
 
-# ---------------- SNYK SCAN ----------------
-      - name: Run Snyk Scan
+# ---------------- SNYK SCA ----------------
+      - name: Run Snyk Scan (SCA)
         run: |
           npm install -g snyk
           cd src
@@ -58,6 +58,27 @@ jobs:
           snyk test --file=requirements.txt --severity-threshold=medium
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+# ---------------- DOCKER LOGIN ----------------
+      - name: Docker Login
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+# ---------------- BUILD DOCKER IMAGE ----------------
+      - name: Build Docker Image
+        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:latest .
+
+# ---------------- SNYK IMAGE SCAN ----------------
+      - name: Snyk Container Scan
+        run: |
+          npm install -g snyk
+          snyk auth $SNYK_TOKEN
+          snyk container test ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:latest --severity-threshold=medium
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+# ---------------- PUSH IMAGE ----------------
+      - name: Push Docker Image
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:latest
 
 # ---------------- FAILURE EMAIL ----------------
       - name: Send Notification on Failure
@@ -76,7 +97,8 @@ jobs:
 
             Reasons:
             - SonarQube Quality Gate Failed
-            - OR Snyk found vulnerabilities (>= MEDIUM)
+            - OR Snyk SCA found vulnerabilities
+            - OR Docker Image Scan failed
 
             Logs:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -100,7 +122,9 @@ jobs:
             Project: ${{ github.repository }}
 
             ✔ SonarQube Quality Gate Passed
-            ✔ No vulnerabilities found by Snyk
+            ✔ Snyk SCA Passed
+            ✔ Docker Image Scan Passed
+            ✔ Image pushed successfully 🚀
 
             View Sonar Report:
             ${{ secrets.SONAR_HOST_URL }}/dashboard?id=payment-microservice
