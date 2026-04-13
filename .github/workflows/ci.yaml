@@ -1,4 +1,4 @@
-name: SonarQube Scan & Snyk Alert
+name: SonarQube Scan, Snyk SCA & Trivy Image Scan
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
         with:
           fetch-depth: 0
 
-# ---------------- SONARQUBE ----------------
+# ---------------- SONARQUBE (SAST) ----------------
       - name: SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@v3
         env:
@@ -70,14 +70,14 @@ jobs:
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:latest .
 
-# ---------------- SNYK IMAGE SCAN ----------------
-      - name: Run Snyk to check Docker image for vulnerabilities
-        uses: snyk/actions/docker@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+# ---------------- TRIVY IMAGE SCAN ----------------
+      - name: Scan Docker Image with Trivy
+        uses: aquasecurity/trivy-action@0.20.0
         with:
-          image: ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:latest
-          args: --severity-threshold=high
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:latest
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: 1
 
 # ---------------- PUSH IMAGE ----------------
       - name: Push Docker Image
@@ -102,7 +102,7 @@ jobs:
             Failed Stage:
             - SonarQube OR
             - Snyk SCA OR
-            - Docker Scan
+            - Trivy Image Scan
 
             Logs:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -125,7 +125,7 @@ jobs:
 
             ✔ SonarQube Quality Gate
             ✔ Snyk SCA Scan
-            ✔ Docker Image Scan
+            ✔ Trivy Image Scan
 
             🚀 Image pushed successfully
 
