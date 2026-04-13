@@ -54,16 +54,16 @@ jobs:
           exit-code: 0
 
 # ---------------- DOCKER LOGIN ----------------
-      # - name: Docker Login
-      #   run: |
-      #     echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login \
-      #     -u "${{ secrets.DOCKERHUB_USERNAME }}" \
-      #     --password-stdin
+      - name: Docker Login
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login \
+          -u "${{ secrets.DOCKERHUB_USERNAME }}" \
+          --password-stdin
 
 # ---------------- PUSH IMAGE ----------------
-      # - name: Push Docker Image
-      #   run: |
-      #     docker push ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:${{ env.IMAGE_TAG }}
+      - name: Push Docker Image
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:${{ env.IMAGE_TAG }}
 
 # ---------------- FAILURE EMAIL ----------------
       - name: Send Failure Email
