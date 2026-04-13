@@ -70,7 +70,7 @@ jobs:
           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:latest
           format: table
           severity: HIGH,CRITICAL
-          exit-code: 0
+          exit-code: 1
 
 # ---------------- DOCKER LOGIN ----------------
       - name: Docker Login
@@ -93,9 +93,9 @@ jobs:
           server_port: 465
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: "❌ Pipeline Failed: ${{ github.repository }}"
+          subject: "Pipeline Failed: ${{ github.repository }}"
           body: |
-            🚨 DevSecOps Pipeline Failed!
+            DevSecOps Pipeline Failed
 
             Project: ${{ github.repository }}
 
@@ -119,15 +119,15 @@ jobs:
           server_port: 465
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: "✅ Pipeline Success: ${{ github.repository }}"
+          subject: "Pipeline Success: ${{ github.repository }}"
           body: |
-            🎉 DevSecOps Pipeline Passed!
+            DevSecOps Pipeline Passed
 
-            ✔ SonarQube Quality Gate
-            ✔ Snyk SCA Scan
-            ✔ Trivy Image Scan
+            SonarQube Quality Gate passed
+            Snyk SCA Scan passed
+            Trivy Image Scan passed
 
-            🚀 Image built, scanned, and pushed successfully
+            Image built, scanned, and pushed successfully
 
             View Sonar Report:
             ${{ secrets.SONAR_HOST_URL }}/dashboard?id=payment-microservice
