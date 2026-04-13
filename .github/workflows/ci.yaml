@@ -58,13 +58,6 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-# ---------------- DOCKER LOGIN ----------------
-      - name: Docker Login
-        run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login \
-          -u "${{ secrets.DOCKERHUB_USERNAME }}" \
-          --password-stdin
-
 # ---------------- BUILD DOCKER IMAGE ----------------
       - name: Build Docker Image
         run: |
@@ -72,12 +65,19 @@ jobs:
 
 # ---------------- TRIVY IMAGE SCAN ----------------
       - name: Scan Docker Image with Trivy
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@v0.24.0
         with:
           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:latest
           format: table
           severity: HIGH,CRITICAL
           exit-code: 1
+
+# ---------------- DOCKER LOGIN ----------------
+      - name: Docker Login
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login \
+          -u "${{ secrets.DOCKERHUB_USERNAME }}" \
+          --password-stdin
 
 # ---------------- PUSH IMAGE ----------------
       - name: Push Docker Image
@@ -127,7 +127,7 @@ jobs:
             ✔ Snyk SCA Scan
             ✔ Trivy Image Scan
 
-            🚀 Image pushed successfully
+            🚀 Image built, scanned, and pushed successfully
 
             View Sonar Report:
             ${{ secrets.SONAR_HOST_URL }}/dashboard?id=payment-microservice
