@@ -1,91 +1,72 @@
-name: SonarQube Scan, Snyk SCA & Trivy Image Scan
+name: CI - Docker Build, Scan and Push
 
 on:
-  push:
-    branches:
-      - actions
-      - main
-  pull_request:
-    types: [opened, synchronize, reopened]
+  workflow_run:
+    workflows: ["CI - Code Quality and SCA"]
+    types:
+      - completed
+
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Docker Image Tag (format: vX.X.X)"
+        required: true
 
 jobs:
-  sonarqube:
+  docker:
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
 
     steps:
+# ---------------- VALIDATE IMAGE TAG ----------------
+      - name: Validate Image Tag
+        run: |
+          TAG="${{ github.event.inputs.image_tag }}"
+
+          if [ -z "$TAG" ]; then
+            echo "Image tag is required"
+            exit 1
+          fi
+
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid tag format. Use vX.X.X (e.g., v1.1.1)"
+            exit 1
+          fi
+
+          echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
+
 # ---------------- CHECKOUT ----------------
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-# ---------------- SONARQUBE (SAST) ----------------
-      - name: SonarQube Scan
-        uses: sonarsource/sonarqube-scan-action@v3
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        with:
-          args: >
-            -Dsonar.projectKey=payment-microservice
-            -Dsonar.sources=.
-
-      - name: SonarQube Quality Gate Check
-        uses: sonarsource/sonarqube-quality-gate-action@v1
-        timeout-minutes: 5
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
-# ---------------- SETUP PYTHON ----------------
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-# ---------------- INSTALL DEPENDENCIES ----------------
-      - name: Install dependencies
-        run: |
-          cd src
-          pip install -r requirements.txt
-
-# ---------------- SNYK SCA ----------------
-      - name: Run Snyk Scan (SCA)
-        run: |
-          npm install -g snyk
-          cd src
-          snyk auth $SNYK_TOKEN
-          snyk test --file=requirements.txt --severity-threshold=medium
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
 # ---------------- BUILD DOCKER IMAGE ----------------
       - name: Build Docker Image
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:latest .
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:${{ env.IMAGE_TAG }} .
 
 # ---------------- TRIVY IMAGE SCAN ----------------
       - name: Scan Docker Image with Trivy
         uses: aquasecurity/trivy-action@v0.24.0
         with:
-          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:latest
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:${{ env.IMAGE_TAG }}
           format: table
           severity: HIGH,CRITICAL
           exit-code: 0
 
 # ---------------- DOCKER LOGIN ----------------
-      - name: Docker Login
-        run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login \
-          -u "${{ secrets.DOCKERHUB_USERNAME }}" \
-          --password-stdin
+      # - name: Docker Login
+      #   run: |
+      #     echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login \
+      #     -u "${{ secrets.DOCKERHUB_USERNAME }}" \
+      #     --password-stdin
 
 # ---------------- PUSH IMAGE ----------------
-      - name: Push Docker Image
-        run: |
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:latest
+      # - name: Push Docker Image
+      #   run: |
+      #     docker push ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:${{ env.IMAGE_TAG }}
 
 # ---------------- FAILURE EMAIL ----------------
-      - name: Send Notification on Failure
+      - name: Send Failure Email
         if: failure()
         uses: dawidd6/action-send-mail@v3
         with:
@@ -93,16 +74,14 @@ jobs:
           server_port: 465
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: "Pipeline Failed: ${{ github.repository }}"
+          subject: "Docker Pipeline Failed: ${{ github.repository }}"
           body: |
-            DevSecOps Pipeline Failed
+            Docker Pipeline Failed
 
-            Project: ${{ github.repository }}
+            Repository: ${{ github.repository }}
 
             Failed Stage:
-            - SonarQube OR
-            - Snyk SCA OR
-            - Trivy Image Scan
+            - Tag Validation or Trivy Scan or Docker Push
 
             Logs:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -111,7 +90,7 @@ jobs:
           from: DevOps Alert
 
 # ---------------- SUCCESS EMAIL ----------------
-      - name: Send Notification on Success
+      - name: Send Success Email
         if: success()
         uses: dawidd6/action-send-mail@v3
         with:
@@ -119,18 +98,14 @@ jobs:
           server_port: 465
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: "Pipeline Success: ${{ github.repository }}"
+          subject: "Docker Pipeline Success: ${{ github.repository }}"
           body: |
-            DevSecOps Pipeline Passed
-
-            SonarQube Quality Gate passed
-            Snyk SCA Scan passed
-            Trivy Image Scan passed
+            Docker Pipeline Passed
 
             Image built, scanned, and pushed successfully
 
-            View Sonar Report:
-            ${{ secrets.SONAR_HOST_URL }}/dashboard?id=payment-microservice
+            Image:
+            ${{ secrets.DOCKERHUB_USERNAME }}/payment-microservice:${{ env.IMAGE_TAG }}
 
           to: ${{ secrets.RECIVER_EMAIL }}
           from: DevOps Alert

@@ -1,0 +1,83 @@
+name: CI - Code Quality and SCA
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  quality-check:
+    runs-on: ubuntu-latest
+
+    steps:
+# ---------------- CHECKOUT ----------------
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+# ---------------- SONARQUBE ----------------
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@v3
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=payment-microservice
+            -Dsonar.sources=.
+
+      - name: SonarQube Quality Gate Check
+        uses: sonarsource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+# ---------------- SETUP PYTHON ----------------
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+# ---------------- INSTALL DEPENDENCIES ----------------
+      - name: Install dependencies
+        run: |
+          cd src
+          pip install -r requirements.txt
+
+# ---------------- SNYK SCA ----------------
+      - name: Run Snyk Scan (SCA)
+        run: |
+          npm install -g snyk
+          cd src
+          snyk auth $SNYK_TOKEN
+          snyk test --file=requirements.txt --severity-threshold=medium
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+# ---------------- FAILURE EMAIL ----------------
+      - name: Send Failure Email
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "CI Quality Pipeline Failed: ${{ github.repository }}"
+          body: |
+            CI Quality Pipeline Failed
+
+            Repository: ${{ github.repository }}
+
+            Failed Stage:
+            - SonarQube or Snyk
+
+            Logs:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          to: ${{ secrets.RECIVER_EMAIL }}
+          from: DevOps Alert
+
